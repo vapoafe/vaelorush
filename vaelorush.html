@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vaelorush</title>
+<style>
+  body, html { 
+    margin: 0; padding: 0; background-color: #1a1a1a; color: #fff; 
+    font-family: 'Courier New', Courier, monospace; 
+    width: 100%; height: 100%; overflow: hidden; 
+  }
+  #game-container { 
+    position: relative; width: 100vw; height: 100vh; 
+    image-rendering: pixelated; 
+  }
+  canvas { background-color: #2c3e50; display: block; }
+  .screen { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+    background: #1e272ed1; display: flex; flex-direction: column; 
+    justify-content: center; align-items: center; pointer-events: auto; 
+    z-index: 10;
+  }
+  h1 { color: #f1c40f; text-shadow: 2px 2px #000; font-size: 48px; margin-bottom: 10px; text-align: center;}
+  p.subtitle { margin-top: 0; color: #aaa; margin-bottom: 30px; font-size: 20px;}
+  .form-group { margin: 15px 0; font-size: 20px; text-align: center; }
+  select, button { 
+    font-family: inherit; font-size: 18px; padding: 12px; 
+    background: #333; color: #fff; border: 2px solid #555; cursor: pointer; border-radius: 4px;
+    width: 350px;
+  }
+  button { background: #934c0b; border-color: #242424; font-weight: bold; margin-top: 30px;}
+  button:hover { background: #703d0d; }
+  
+  #hud { 
+    position: absolute; top: 20px; left: 20px; text-shadow: 2px 2px 0 #000; 
+    font-weight: bold; font-size: 22px; pointer-events: none; z-index: 5;
+  }
+  .hidden { display: none !important; }
+  .hud-stat { color: #f1c40f; }
+  .controls-hint { font-size: 16px; margin-top: 15px; color: #bbb; }
+  
+  /* Pause Menu Styles */
+  .menu-option {
+    font-size: 24px; padding: 15px 30px; margin: 10px;
+    border: 2px solid transparent; color: #aaa;
+    transition: all 0.2s;
+  }
+  .menu-option.selected {
+    border-color: #f1c40f; color: #f1c40f; background: rgba(241, 196, 15, 0.2);
+  }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  <canvas id="gameCanvas"></canvas>
+  
+  <div id="hud" class="hidden">
+    <div>HP: <span id="hud-hp" class="hud-stat"></span>/<span id="hud-maxhp"></span></div>
+    <div>Level: <span id="hud-lvl" class="hud-stat"></span> (<span id="hud-xp"></span>/<span id="hud-nextxp"></span> XP)</div>
+    <div>Weapon Buff: <span id="hud-wep" class="hud-stat">None</span></div>
+    <div>Armor Buff: <span id="hud-arm" class="hud-stat">None</span></div>
+    <div class="controls-hint">[A/D] Move | [W] Jump | [SPACE] Attack | [ESC] Pause</div>
+  </div>
+
+  <div id="start-screen" class="screen">
+    <h1>Vaelorush</h1>
+    <p class="subtitle">Select your character's Ancestry & Class</p>
+    
+    <div class="form-group">
+      <label style="display:block; margin-bottom:5px;">Ancestry:</label>
+      <select id="sel-ancestry">
+        <option value="human">Human (Balanced, +Damage)</option>
+        <option value="elf">Elf (+Speed, +Jump Power, -HP)</option>
+        <option value="dwarf">Dwarf (++Max HP, -Speed)</option>
+        <option value="halfling">Halfling (Small hitbox, +Jump)</option>
+        <option value="goblin">Goblin (Very Fast, -Damage)</option>
+        <option value="orc">Orc (++Damage, ++HP, -Speed, -Jump)</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label style="display:block; margin-bottom:5px;">Class:</label>
+      <select id="sel-class">
+        <option value="fighter">Fighter (High HP, Greatsword)</option>
+        <option value="rogue">Rogue (Double Jump, Fast Daggers)</option>
+        <option value="wizard">Wizard (Magic Missiles, Staff)</option>
+        <option value="cleric">Cleric (Heals over time, Mace)</option>
+        <option value="ranger">Ranger (Fast Arrows, Bow)</option>
+      </select>
+    </div>
+    
+    <button id="btn-start">Enter the Dungeon</button>
+  </div>
+
+  <div id="pause-screen" class="screen hidden">
+    <h1>PAUSED</h1>
+    <div id="menu-resume" class="menu-option selected">Resume Game</div>
+    <div id="menu-difficulty" class="menu-option">Difficulty: Normal</div>
+    <div id="menu-quit" class="menu-option">Quit to Main Menu</div>
+    <p class="controls-hint" style="margin-top: 40px;">[Up/Down] Navigate | [Enter] Select</p>
+  </div>
+
+  <div id="game-over-screen" class="screen hidden">
+    <h1 style="color: #ff6656;">You Fell in Battle</h1>
+    <p style="font-size: 28px;">Level Reached: <span id="go-level" style="color: #f1c40f;"></span></p>
+    <button id="btn-restart">Roll a New Character</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const startScreen = document.getElementById('start-screen');
+const pauseScreen = document.getElementById('pause-screen');
+const gameOverScreen = document.getElementById('game-over-screen');
+const hud = document.getElementById('hud');
+
+let gameState = 'menu'; // menu, playing, paused, gameover
+let keys = {};
+
+// Game configuration variables
+let difficultyMult = 1.0; 
+let difficultyLabel = "Normal";
+const difficulties = [
+  { label: "Easy", mult: 0.7 },
+  { label: "Normal", mult: 1.0 },
+  { label: "Hard", mult: 1.5 },
+  { label: "Nightmare", mult: 2.5 }
+];
+let difficultyIndex = 1;
+
+// Pause menu navigation
+let pauseMenuIndex = 0;
+const pauseOptions = ['menu-resume', 'menu-difficulty', 'menu-quit'];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Keyboard listener to handle menus
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+
+  if (e.code === 'Escape') {
+    if (gameState === 'playing') {
+      gameState = 'paused';
+      pauseMenuIndex = 0;
+      updatePauseMenuVisuals();
+      pauseScreen.classList.remove('hidden');
+    } else if (gameState === 'paused') {
+      gameState = 'playing';
+      pauseScreen.classList.add('hidden');
+    }
+  }
+
+  if (gameState === 'paused') {
+    if (e.code === 'ArrowUp') {
+      pauseMenuIndex = Math.max(0, pauseMenuIndex - 1);
+      updatePauseMenuVisuals();
+    }
+    if (e.code === 'ArrowDown') {
+      pauseMenuIndex = Math.min(pauseOptions.length - 1, pauseMenuIndex + 1);
+      updatePauseMenuVisuals();
+    }
+    if (e.code === 'Enter') {
+      executePauseMenu();
+    }
+  }
+});
+
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+// Button click fallbacks for mouse users
+document.getElementById('btn-start').addEventListener('click', startGame);
+document.getElementById('btn-restart').addEventListener('click', () => {
+  gameOverScreen.classList.add('hidden');
+  startScreen.classList.remove('hidden');
+});
+
+// Pause Menu Logic
+function updatePauseMenuVisuals() {
+  pauseOptions.forEach((id, index) => {
+    let el = document.getElementById(id);
+    if (index === pauseMenuIndex) el.classList.add('selected');
+    else el.classList.remove('selected');
+  });
+}
+
+function executePauseMenu() {
+  if (pauseMenuIndex === 0) { // Resume
+    gameState = 'playing';
+    pauseScreen.classList.add('hidden');
+  } 
+  else if (pauseMenuIndex === 1) { // Toggle Difficulty
+    difficultyIndex = (difficultyIndex + 1) % difficulties.length;
+    difficultyMult = difficulties[difficultyIndex].mult;
+    difficultyLabel = difficulties[difficultyIndex].label;
+    document.getElementById('menu-difficulty').innerText = "Difficulty: " + difficultyLabel;
+  } 
+  else if (pauseMenuIndex === 2) { // Quit
+    gameState = 'menu';
+    pauseScreen.classList.add('hidden');
+    hud.classList.add('hidden');
+    startScreen.classList.remove('hidden');
+  }
+}
+
+const GRAVITY = 0.5;
+const FRICTION = 0.8;
+let camera = { x: 0, y: 0 };
+
+let platforms = [], enemies = [], projectiles = [], items = [], particles = [];
+let player = {};
+let highestPlatformX = 0; // Tracks the edge of the generated world
+
+function startGame() {
+  const ancestry = document.getElementById('sel-ancestry').value;
+  const pClass = document.getElementById('sel-class').value;
+  
+  // Adjusted starting Y so the player falls safely to the floor
+  player = {
+    x: 100, y: 300, width: 20, height: 36, vx: 0, vy: 0,
+    speed: 5, jumpPower: -11, maxJumps: 1, jumps: 0,
+    hp: 20, maxHp: 20, damage: 5, level: 1, xp: 0, xpNeeded: 20,
+    class: pClass, ancestry: ancestry,
+    attackCooldown: 25, attackTimer: 0, attackDir: 1,
+    skinColor: '#ffcc99', bodyColor: '#ccc',
+    weaponName: 'Basic', armorName: 'Basic',
+    weaponColor: '#bdc3c7', regenTimer: 0, invuln: 0
+  };
+
+  // Ancestry Modifiers
+  switch(ancestry) {
+    case 'human': player.maxHp += 5; player.damage += 1; break;
+    case 'elf': player.speed += 1.5; player.jumpPower -= 1; player.maxHp -= 2; player.skinColor = '#fdf3e7'; break;
+    case 'dwarf': player.maxHp += 15; player.speed -= 1.5; player.skinColor = '#d9a066'; player.width = 24; player.height = 32; break;
+    case 'halfling': player.jumpPower -= 1.5; player.height = 24; player.maxHp -= 5; break;
+    case 'goblin': player.speed += 2; player.damage -= 1; player.skinColor = '#27ae60'; player.height = 26; break;
+    case 'orc': player.damage += 3; player.maxHp += 10; player.speed -= 1; player.jumpPower += 2; player.skinColor = '#2e4029'; player.width = 26; player.height = 40; break;
+  }
+
+  // Class Modifiers & Equipment Types
+  switch(pClass) {
+    case 'fighter': 
+      player.maxHp += 10; player.damage += 3; player.bodyColor = '#c0392b'; 
+      player.weaponType = 'greatsword'; break;
+    case 'rogue': 
+      player.maxJumps = 2; player.attackCooldown = 12; player.bodyColor = '#2c3e50'; 
+      player.weaponType = 'daggers'; break;
+    case 'wizard': 
+      player.maxHp -= 5; player.bodyColor = '#2980b9'; 
+      player.weaponType = 'staff'; player.weaponColor = '#8e44ad'; break;
+    case 'cleric':
+      player.maxHp += 5; player.bodyColor = '#f39c12';
+      player.weaponType = 'mace'; break;
+    case 'ranger':
+      player.attackCooldown = 20; player.bodyColor = '#27ae60';
+      player.weaponType = 'bow'; player.weaponColor = '#8b4513'; break;
+  }
+  
+  player.hp = player.maxHp;
+  platforms = []; enemies = []; projectiles = []; items = []; particles = [];
+  highestPlatformX = -500;
+  
+  // Generate initial starting area
+  generateChunk(highestPlatformX, 15);
+
+  startScreen.classList.add('hidden');
+  hud.classList.remove('hidden');
+  gameState = 'playing';
+}
+
+// Endless Generation Chunk Engine
+function generateChunk(startX, numPlatforms = 10) {
+  let currentX = startX;
+
+  // Add the solid main floor section below the platforms
+  platforms.push({ x: currentX, y: 550, width: numPlatforms * 450, height: 600, isFloor: true });
+
+  for (let i = 0; i < numPlatforms; i++) {
+    let w = 150 + Math.random() * 300;
+    let y = 300 + Math.random() * 150; 
+    
+    platforms.push({ x: currentX, y: y, width: w, height: 40, isFloor: false });
+    
+    // Spawn Enemies (Harder as player level increases)
+    if (Math.random() > 0.3) {
+      // Determine if the enemy spawns on the ledge or down on the main ground
+      let spawnOnGround = Math.random() > 0.5;
+      let spawnY = spawnOnGround ? 500 : y - 50;
+      
+      // Level Scaling Stats
+      let statMultiplier = 1 + (player.level * 0.15) * difficultyMult;
+
+      let e = {
+        x: currentX + w/2, y: spawnY, width: 24, height: 34,
+        vx: 0, vy: 0, speed: 2 + (player.level * 0.05), // Get slightly faster over time
+        hp: 10 * statMultiplier, maxHp: 10 * statMultiplier, 
+        damage: 3 * statMultiplier, xpVal: Math.floor(10 * statMultiplier),
+        invuln: 0, type: 'Goblin', color: '#2ecc71',
+        patrolStartX: currentX, patrolEndX: currentX + w
+      };
+      
+      let typeRoll = Math.random();
+      if (typeRoll > 0.8) {
+        e.type = 'Ogre'; e.width = 40; e.height = 50; 
+        e.hp = 40 * statMultiplier; e.maxHp = 40 * statMultiplier;
+        e.damage = 10 * statMultiplier; e.xpVal = Math.floor(25 * statMultiplier); 
+        e.color = '#7f8c8d'; e.speed = 1 + (player.level * 0.02);
+      } else if (typeRoll > 0.5) {
+        e.type = 'Orc'; e.hp = 20 * statMultiplier; e.maxHp = 20 * statMultiplier; 
+        e.damage = 6 * statMultiplier; e.xpVal = Math.floor(15 * statMultiplier); 
+        e.color = '#1e5128'; e.speed = 1.5 + (player.level * 0.03);
+      }
+      
+      e.vx = (Math.random() > 0.5 ? 1 : -1) * e.speed;
+
+      // Expand patrol area if they spawn on the endless main floor
+      if (spawnOnGround) {
+        e.patrolStartX = currentX - 200;
+        e.patrolEndX = currentX + w + 200;
+      }
+
+      enemies.push(e);
+    }
+    // Advance X coordinate to create gaps between floating ledges
+    currentX += w + 80 + Math.random() * 150;
+  }
+  highestPlatformX = currentX;
+}
+
+function spawnFloatingText(x, y, text, color) {
+  particles.push({ x: x, y: y, text: text, color: color, life: 40, maxLife: 40 });
+}
+
+function spawnLoot(x, y) {
+  // Loot table gets better with higher levels and higher difficulty
+  const basePool = [
+    { name: 'Flaming Rune (+Dmg)', type: 'wep', color: '#e74c3c', dmgBonus: 4, hpBonus: 0 },
+    { name: 'Frost Rune (+Dmg)', type: 'wep', color: '#00ffff', dmgBonus: 4, hpBonus: 0 },
+    { name: 'Mithral Armor (+HP)', type: 'arm', color: '#bdc3c7', dmgBonus: 0, hpBonus: 20 },
+  ];
+  const rarePool = [
+    { name: 'Dragon Slayer (+Dmg)', type: 'wep', color: '#f39c12', dmgBonus: 12, hpBonus: 0 },
+    { name: 'Adamantine Plate (++HP)', type: 'arm', color: '#34495e', dmgBonus: 0, hpBonus: 50 }
+  ];
+
+  let dropChance = player.level * difficultyMult * 2; // Increases chances of rolling Rare
+  let loot;
+  
+  if (Math.random() * 100 < dropChance) {
+    loot = rarePool[Math.floor(Math.random() * rarePool.length)];
+  } else {
+    loot = basePool[Math.floor(Math.random() * basePool.length)];
+  }
+  
+  items.push({ x: x, y: y, width: 16, height: 16, loot: loot, vy: -6, bob: 0 });
+}
+
+function checkCollision(r1, r2) {
+  return r1.x < r2.x + r2.width && r1.x + r1.width > r2.x &&
+         r1.y < r2.y + r2.height && r1.y + r1.height > r2.y;
+}
+
+function applyPhysicsAndCollision(entity, isPlayer) {
+  entity.vy += GRAVITY;
+  if (!isPlayer && entity.invuln <= 0) {
+    // Enemy normal logic
+  } else {
+    entity.vx *= FRICTION;
+  }
+
+  // X Collision
+  entity.x += entity.vx;
+  for (let p of platforms) {
+    if (checkCollision(entity, p)) {
+      if (entity.vx > 0) { entity.x = p.x - entity.width; entity.vx = 0; }
+      else if (entity.vx < 0) { entity.x = p.x + p.width; entity.vx = 0; }
+    }
+  }
+
+  // Y Collision
+  entity.y += entity.vy;
+  let onGround = false;
+  for (let p of platforms) {
+    if (checkCollision(entity, p)) {
+      if (entity.vy > 0) {
+        entity.y = p.y - entity.height;
+        entity.vy = 0;
+        onGround = true;
+      } else if (entity.vy < 0) {
+        entity.y = p.y + p.height;
+        entity.vy = 0;
+      }
+    }
+  }
+  return onGround;
+}
+
+function update() {
+  if (gameState !== 'playing') return;
+
+  // ENDLESS GENERATION CHECK
+  if (player.x + 2000 > highestPlatformX) {
+    generateChunk(highestPlatformX, 10);
+    
+    // Garbage collection for memory: Remove old platforms & enemies far behind the player
+    platforms = platforms.filter(p => p.x + p.width > player.x - 3000);
+    enemies = enemies.filter(e => e.x > player.x - 3000);
+    items = items.filter(i => i.x > player.x - 3000);
+  }
+
+  // Horizontal Movement
+  if (keys['ArrowLeft'] || keys['KeyA']) { player.vx -= 1.2; player.attackDir = -1; }
+  if (keys['ArrowRight'] || keys['KeyD']) { player.vx += 1.2; player.attackDir = 1; }
+  
+  // Cap speed
+  if (player.vx > player.speed) player.vx = player.speed;
+  if (player.vx < -player.speed) player.vx = -player.speed;
+  
+  // Jump Logic
+  if ((keys['ArrowUp'] || keys['KeyW']) && player.jumps < player.maxJumps) {
+    player.vy = player.jumpPower;
+    player.jumps++;
+    keys['ArrowUp'] = false; keys['KeyW'] = false; 
+  }
+
+  let playerOnGround = applyPhysicsAndCollision(player, true);
+  if (playerOnGround) player.jumps = 0;
+
+  // Cleric passive heal
+  if (player.class === 'cleric' && player.hp < player.maxHp) {
+    player.regenTimer++;
+    if (player.regenTimer > 180) { // Heal 1 HP every 3 seconds roughly
+      player.hp++;
+      player.regenTimer = 0;
+      spawnFloatingText(player.x, player.y - 10, "+1", '#2ecc71');
+    }
+  }
+
+  // Safe boundary fallback
+  if (player.y > 2000) player.hp = 0; 
+
+  // Smooth Camera track (centers player on screen)
+  camera.x += (player.x - canvas.width / 2 - camera.x) * 0.1;
+  camera.y += (player.y - canvas.height / 1.5 - camera.y) * 0.1;
+
+  // Timers
+  if (player.attackTimer > 0) player.attackTimer--;
+  if (player.invuln > 0) player.invuln--;
+
+  // Attack Action
+  if (keys['Space'] && player.attackTimer <= 0) {
+    player.attackTimer = player.attackCooldown;
+    
+    if (player.class === 'wizard' || player.class === 'ranger') {
+      let isMagic = player.class === 'wizard';
+      projectiles.push({
+        x: player.attackDir > 0 ? player.x + player.width : player.x - 15, 
+        y: player.y + player.height / 2 - 5,
+        width: isMagic ? 12 : 16, height: isMagic ? 12 : 4, 
+        vx: player.attackDir * (isMagic ? 8 : 12), 
+        life: 80, damage: player.damage,
+        color: isMagic ? player.weaponColor : '#fff'
+      });
+    } else {
+      // Melee Hitbox
+      let range = player.weaponType === 'greatsword' ? 60 : 40;
+      let hitbox = {
+        x: player.attackDir === 1 ? player.x + player.width : player.x - range,
+        y: player.y - 10, width: range, height: player.height + 20
+      };
+      
+      for (let e of enemies) {
+        if (checkCollision(hitbox, e)) {
+          hitEnemy(e, player.damage);
+        }
+      }
+    }
+    keys['Space'] = false; 
+  }
+
+  // Update Projectiles
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    let p = projectiles[i];
+    p.x += p.vx;
+    p.life--;
+    let hit = false;
+    for (let e of enemies) {
+      if (checkCollision(p, e)) {
+        hitEnemy(e, p.damage, p.vx > 0 ? 1 : -1);
+        hit = true;
+        break;
+      }
+    }
+    if (hit || p.life <= 0) projectiles.splice(i, 1);
+  }
+
+  // Update Enemies
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    let e = enemies[i];
+    
+    // Gravity & Physics for enemies
+    applyPhysicsAndCollision(e, false);
+
+    if (e.invuln > 0) {
+      e.invuln--;
+    } else {
+      // Patrol behavior (only move horizontally when not knocked back)
+      e.vx = (e.vx > 0 ? 1 : -1) * e.speed; // Maintain speed direction
+      if (e.x <= e.patrolStartX) e.vx = Math.abs(e.speed);
+      if (e.x + e.width >= e.patrolEndX) e.vx = -Math.abs(e.speed);
+    }
+
+    // Contact Damage to Player
+    if (checkCollision(player, e) && player.invuln <= 0 && e.hp > 0) {
+      player.hp -= e.damage;
+      player.invuln = 45; 
+      player.vy = -6; // Player gets knocked back too
+      player.vx = (player.x < e.x ? -6 : 6);
+      spawnFloatingText(player.x, player.y - 10, "-" + Math.floor(e.damage), '#f00');
+    }
+
+    // Death Cleanup & Scaling Loot Drop
+    if (e.y > 2000 || e.hp <= 0) {
+      if (e.hp <= 0) {
+        player.xp += e.xpVal;
+        spawnFloatingText(e.x, e.y - 15, "+" + e.xpVal + " XP", '#f1c40f');
+        // Drop rate increases slightly with level
+        if (Math.random() > Math.max(0.4, 0.75 - (player.level * 0.02))) spawnLoot(e.x, e.y); 
+      }
+      enemies.splice(i, 1);
+    }
+  }
+
+  // Update Loot
+  for (let i = items.length - 1; i >= 0; i--) {
+    let it = items[i];
+    it.bob += 0.1;
+    // Loot physics
+    it.vy += GRAVITY;
+    it.y += it.vy;
+    for (let p of platforms) {
+      if (checkCollision(it, p) && it.vy > 0) {
+        it.y = p.y - it.height; it.vy = 0;
+      }
+    }
+    
+    // Render bobbing visually but hitbox stays solid
+    let visualY = it.y + Math.sin(it.bob) * 3; 
+    it.visualY = visualY;
+
+    if (checkCollision(player, it)) {
+      if (it.loot.type === 'wep') {
+        player.weaponName = it.loot.name;
+        player.weaponColor = it.loot.color;
+        player.damage += it.loot.dmgBonus;
+      } else if (it.loot.type === 'arm') {
+        player.armorName = it.loot.name;
+        player.bodyColor = it.loot.color;
+        player.maxHp += it.loot.hpBonus; 
+        player.hp += it.loot.hpBonus;
+      }
+      spawnFloatingText(player.x, player.y - 30, "Got: " + it.loot.name, '#0ff');
+      items.splice(i, 1);
+    }
+  }
+
+  // Update Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].y -= 1;
+    particles[i].life--;
+    if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+
+  // Level Up System
+  if (player.xp >= player.xpNeeded) {
+    player.level++;
+    player.xp -= player.xpNeeded;
+    player.xpNeeded = Math.floor(player.xpNeeded * 1.5);
+    player.maxHp += 8;
+    player.hp = player.maxHp; 
+    player.damage += 2;
+    spawnFloatingText(player.x, player.y - 50, "LEVEL UP!", '#f1c40f');
+  }
+
+  // Death State
+  if (player.hp <= 0) {
+    gameState = 'gameover';
+    hud.classList.add('hidden');
+    gameOverScreen.classList.remove('hidden');
+    document.getElementById('go-level').innerText = player.level;
+  }
+
+  updateHUD();
+}
+
+// Applies damage and physical knockback to enemies
+function hitEnemy(e, dmg, directionOverride = null) {
+  e.hp -= dmg;
+  e.invuln = 15;
+  // Knockback physics
+  let pushDir = directionOverride !== null ? directionOverride : player.attackDir;
+  e.vx = pushDir * 7; 
+  e.vy = -5; // Pop them up into the air
+  spawnFloatingText(e.x, e.y - 10, "-" + Math.floor(dmg), '#fff');
+}
+
+function updateHUD() {
+  document.getElementById('hud-hp').innerText = Math.floor(Math.max(0, player.hp));
+  document.getElementById('hud-maxhp').innerText = Math.floor(player.maxHp);
+  document.getElementById('hud-lvl').innerText = player.level;
+  document.getElementById('hud-xp').innerText = player.xp;
+  document.getElementById('hud-nextxp').innerText = player.xpNeeded;
+  document.getElementById('hud-wep').innerText = player.weaponName;
+  document.getElementById('hud-arm').innerText = player.armorName;
+}
+
+// Rendering System
+function drawPlayer() {
+  if (player.invuln > 0 && Math.floor(Date.now() / 100) % 2 === 0) return; // Damage blink
+
+  const px = player.x;
+  const py = player.y;
+  const dir = player.attackDir;
+  const w = player.width;
+  const h = player.height;
+
+  // Head
+  ctx.fillStyle = player.skinColor;
+  ctx.beginPath();
+  let headSize = w * 0.45;
+  ctx.arc(px + w/2, py + headSize, headSize, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eye
+  ctx.fillStyle = '#000';
+  let eyeX = dir === 1 ? px + w/2 + headSize/2 : px + w/2 - headSize/2;
+  ctx.fillRect(eyeX - 1.5, py + headSize - 2, 3, 3);
+
+  // Body
+  ctx.fillStyle = player.bodyColor;
+  ctx.fillRect(px + w*0.15, py + headSize*2, w*0.7, h - headSize*2 - 8);
+
+  // Legs (animating slightly if moving)
+  ctx.fillStyle = '#111';
+  let walkCycle = (Math.abs(player.vx) > 0.5) ? Math.sin(Date.now() / 100) * 4 : 0;
+  ctx.fillRect(px + w*0.2 - walkCycle, py + h - 8, w*0.25, 8); // Back leg
+  ctx.fillRect(px + w*0.55 + walkCycle, py + h - 8, w*0.25, 8); // Front leg
+
+  // Held Weapon Drawing
+  ctx.save();
+  // Anchor weapon around the center of the body
+  let armX = px + w/2;
+  let armY = py + headSize*2 + 4;
+  ctx.translate(armX, armY);
+
+  // Swing animation
+  let swingAngle = 0;
+  if (player.attackTimer > player.attackCooldown - 10) {
+    swingAngle = dir === 1 ? Math.PI / 2 : -Math.PI / 2;
+  }
+  ctx.rotate(swingAngle);
+
+  ctx.fillStyle = player.weaponColor;
+  if (player.weaponType === 'greatsword') {
+    let bladeW = 8, bladeH = 35;
+    ctx.fillRect(dir === 1 ? 0 : -bladeW, -5, bladeW, bladeH);
+    ctx.fillStyle = '#f1c40f'; // crossguard
+    ctx.fillRect(dir === 1 ? -4 : -bladeW-4, 5, bladeW + 8, 4);
+  } else if (player.weaponType === 'daggers') {
+    ctx.fillRect(dir === 1 ? 5 : -10, 0, 5, 15);
+    ctx.fillRect(dir === 1 ? -5 : 0, 0, 5, 15); // holds two
+  } else if (player.weaponType === 'staff' || player.weaponType === 'mace') {
+    ctx.fillStyle = '#8b4513'; // wood handle
+    ctx.fillRect(dir === 1 ? 2 : -6, -10, 4, 30);
+    if (player.weaponType === 'mace') {
+      ctx.fillStyle = '#7f8c8d'; // metal head
+      ctx.beginPath();
+      ctx.arc(dir === 1 ? 4 : -4, -10, 6, 0, Math.PI*2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = player.weaponColor; // gem head
+      ctx.beginPath();
+      ctx.arc(dir === 1 ? 4 : -4, -12, 5, 0, Math.PI*2);
+      ctx.fill();
+    }
+  } else if (player.weaponType === 'bow') {
+    ctx.strokeStyle = player.weaponColor;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    // Arc for bow
+    if (dir === 1) ctx.arc(0, 10, 15, -Math.PI/2, Math.PI/2);
+    else ctx.arc(0, 10, 15, Math.PI/2, -Math.PI/2);
+    ctx.stroke();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1; // String
+    ctx.beginPath();
+    ctx.moveTo(0, -5); ctx.lineTo(0, 25);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function draw() {
+  if (gameState !== 'playing' && gameState !== 'paused') return;
+
+  // Background
+  ctx.fillStyle = '#2c3e50'; // Night sky
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(Math.floor(-camera.x), Math.floor(-camera.y));
+
+  // Draw Platforms
+  for (let p of platforms) {
+    if (p.isFloor) {
+      ctx.fillStyle = '#27ae60'; // Main ground grass
+      ctx.fillRect(p.x, p.y, p.width, 20);
+      ctx.fillStyle = '#3e2723'; // Deep earth
+      ctx.fillRect(p.x, p.y + 20, p.width, p.height - 20);
+    } else {
+      ctx.fillStyle = '#5c5b5b'; // Dark stone platform
+      ctx.fillRect(p.x, p.y, p.width, p.height);
+      ctx.fillStyle = '#2ecc71'; // Mossy top
+      ctx.fillRect(p.x, p.y, p.width, 10);
+    }
+  }
+
+  // Draw Enemies
+  for (let e of enemies) {
+    if (e.invuln > 0 && Math.floor(Date.now() / 50) % 2 === 0) continue; 
+    
+    let faceDir = e.vx > 0 ? 1 : -1;
+    
+    // Draw Body
+    ctx.fillStyle = e.color;
+    ctx.fillRect(e.x, e.y, e.width, e.height);
+    
+    // Custom Details based on Type
+    if (e.type === 'Goblin') {
+      // Pointy ears
+      ctx.fillStyle = '#27ae60';
+      ctx.beginPath();
+      ctx.moveTo(e.x + (faceDir === 1 ? e.width : 0), e.y + 10);
+      ctx.lineTo(e.x + (faceDir === 1 ? e.width + 10 : -10), e.y + 5);
+      ctx.lineTo(e.x + (faceDir === 1 ? e.width : 0), e.y + 15);
+      ctx.fill();
+    } else if (e.type === 'Orc') {
+      // Tusks
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(e.x + (faceDir === 1 ? e.width - 4 : 2), e.y + e.height - 12, 2, 6);
+      ctx.fillRect(e.x + (faceDir === 1 ? e.width - 8 : 6), e.y + e.height - 10, 2, 4);
+    } else if (e.type === 'Ogre') {
+      // Cyclops eye
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(e.x + (e.width/2) - 4 + (faceDir * 4), e.y + 8, 12, 12);
+      ctx.fillStyle = '#000'; // pupil
+      ctx.fillRect(e.x + (e.width/2) + (faceDir * 6), e.y + 12, 4, 4);
+    }
+
+    // Default Eyes (if not ogre)
+    if (e.type !== 'Ogre') {
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(e.x + (faceDir === 1 ? e.width - 8 : 4), e.y + 6, 4, 4);
+    }
+    
+    // Enemy HP Bar
+    ctx.fillStyle = '#000';
+    ctx.fillRect(e.x, e.y - 12, e.width, 6);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(e.x + 1, e.y - 11, (e.width - 2) * (e.hp / e.maxHp), 4);
+  }
+
+  // Draw Loot
+  for (let it of items) {
+    let y = it.visualY || it.y;
+    ctx.fillStyle = it.loot.color; 
+    if (it.loot.type === 'wep') {
+      // Draw sword-like shape
+      ctx.fillRect(it.x + 6, y, 4, 16);
+      ctx.fillStyle = '#fff'; ctx.fillRect(it.x + 2, y + 10, 12, 2);
+    } else {
+      // Draw armor shape
+      ctx.fillRect(it.x, y + 4, 16, 12);
+      ctx.fillRect(it.x + 2, y, 12, 4);
+    }
+  }
+
+  // Draw Projectiles
+  for (let p of projectiles) {
+    ctx.fillStyle = p.color || '#fff';
+    ctx.fillRect(p.x, p.y, p.width, p.height);
+  }
+
+  drawPlayer();
+
+  // Draw Damage Numbers & Text
+  ctx.font = 'bold 20px Courier New';
+  ctx.textAlign = 'center';
+  for (let pt of particles) {
+    ctx.globalAlpha = pt.life / pt.maxLife;
+    ctx.fillStyle = pt.color;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.strokeText(pt.text, pt.x, pt.y);
+    ctx.fillText(pt.text, pt.x, pt.y);
+    ctx.globalAlpha = 1.0;
+  }
+
+  ctx.restore();
+}
+
+function gameLoop() {
+  if (gameState === 'playing') {
+    update();
+  }
+  // Draw happens in both 'playing' and 'paused' so the game freezes visually
+  if (gameState === 'playing' || gameState === 'paused') {
+    draw();
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+// Kick off the loop initially
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
