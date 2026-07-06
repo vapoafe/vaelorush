@@ -151,12 +151,12 @@
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px">Ancestry:</label>
           <select id="sel-ancestry">
-            <option value="human">Human (Balanced, +Damage)</option>
-            <option value="elf">Elf (+Speed, +Jump Power, -HP)</option>
+            <option value="human">Human (+HP, +Damage)</option>
+            <option value="elf">Elf (+Speed, +Jump, -HP)</option>
             <option value="dwarf">Dwarf (++Max HP, -Speed)</option>
-            <option value="halfling">Halfling (Small hitbox, +Jump)</option>
-            <option value="goblin">Goblin (Very Fast, -Damage)</option>
-            <option value="orc">Orc (++Damage, ++HP, -Speed, -Jump)</option>
+            <option value="halfling">Halfling (+Speed, -Jump)</option>
+            <option value="goblin">Goblin (+Speed, -Damage)</option>
+            <option value="orc">Orc (++Damage, ++HP, +Jump, -Speed)</option>
           </select>
         </div>
 
@@ -367,6 +367,7 @@
             player.height = 32;
             break;
           case "halfling":
+            player.speed += 2;
             player.jumpPower -= 1.5;
             player.height = 24;
             player.maxHp -= 5;
@@ -382,7 +383,7 @@
             player.maxHp += 10;
             player.speed -= 1;
             player.jumpPower += 2;
-            player.skinColor = "#2e4029";
+            player.skinColor = "#27ae60";
             player.width = 26;
             player.height = 40;
             break;
