@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Vaelorush</title>
     <meta name="description" content="Vaelorush - An endless platformer game" />
     <meta name="author" content="Vasileios Apostolidis-Afentoulis" />
@@ -86,12 +89,14 @@
         font-weight: bold;
         margin-top: 30px;
       }
-      button:hover, button:focus {
+      button:hover,
+      button:focus {
         background: #703d0d;
       }
-      
+
       /* Active Navigation Focus Styles */
-      select.menu-focused, button.menu-focused {
+      select.menu-focused,
+      button.menu-focused {
         border-color: #f1c40f !important;
         box-shadow: 0 0 12px #f1c40f;
         background: #444;
@@ -181,7 +186,9 @@
         border-color: #f1c40f;
       }
       @media (hover: none) and (pointer: coarse) {
-        .controls-hint { display: none; }
+        .controls-hint {
+          display: none;
+        }
       }
     </style>
   </head>
@@ -215,14 +222,23 @@
           <div class="touch-btn" id="btn-right">→</div>
         </div>
         <div id="touch-actions" class="touch-zone">
-          <div class="touch-btn" id="btn-attack" style="font-size: 16px;">ATK</div>
-          <div class="touch-btn" id="btn-jump" style="font-size: 16px;">JUMP</div>
+          <div class="touch-btn" id="btn-attack" style="font-size: 16px">
+            ATK
+          </div>
+          <div class="touch-btn" id="btn-jump" style="font-size: 16px">
+            JUMP
+          </div>
         </div>
       </div>
 
       <div id="start-screen" class="screen">
         <h1>Vaelorush</h1>
-        <p class="subtitle">Select your character's Ancestry & Class<br><span style="font-size:14px; color:#f1c40f;">[Up/Down/Left/Right] to configure | [Enter] to Start</span></p>
+        <p class="subtitle">
+          Select your character's Ancestry & Class<br /><span
+            style="font-size: 14px; color: #f1c40f"
+            >[Up/Down/Left/Right] to configure | [Enter] to Start</span
+          >
+        </p>
 
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px">Ancestry:</label>
@@ -334,7 +350,7 @@
             // Quick high-pitched dual arpeggio ding
             osc.type = "triangle";
             osc.frequency.setValueAtTime(587.33, now); // D5
-            osc.frequency.setValueAtTime(880.00, now + 0.07); // A5
+            osc.frequency.setValueAtTime(880.0, now + 0.07); // A5
             gainNode.gain.setValueAtTime(0.15, now);
             gainNode.gain.linearRampToValueAtTime(0.01, now + 0.22);
             osc.start(now);
@@ -342,7 +358,7 @@
           } else if (type === "levelup") {
             // Triumphant classic chiptune scale run
             osc.type = "sine";
-            const notes = [261.63, 329.63, 392.00, 523.25, 659.25]; // C E G C E
+            const notes = [261.63, 329.63, 392.0, 523.25, 659.25]; // C E G C E
             notes.forEach((freq, i) => {
               osc.frequency.setValueAtTime(freq, now + i * 0.08);
             });
@@ -401,25 +417,36 @@
             e.preventDefault();
           }
           if (e.code === "ArrowDown" || e.code === "KeyS") {
-            startMenuIndex = Math.min(startOptions.length - 1, startMenuIndex + 1);
+            startMenuIndex = Math.min(
+              startOptions.length - 1,
+              startMenuIndex + 1,
+            );
             updateStartMenuVisuals();
             e.preventDefault();
           }
-          
+
           // Dropdown programmatic option cycling
           if (startMenuIndex < 2) {
-            let selectEl = document.getElementById(startOptions[startMenuIndex]);
+            let selectEl = document.getElementById(
+              startOptions[startMenuIndex],
+            );
             if (e.code === "ArrowLeft" || e.code === "KeyA") {
               selectEl.selectedIndex = Math.max(0, selectEl.selectedIndex - 1);
               e.preventDefault();
             }
             if (e.code === "ArrowRight" || e.code === "KeyD") {
-              selectEl.selectedIndex = Math.min(selectEl.options.length - 1, selectEl.selectedIndex + 1);
+              selectEl.selectedIndex = Math.min(
+                selectEl.options.length - 1,
+                selectEl.selectedIndex + 1,
+              );
               e.preventDefault();
             }
           }
 
-          if (e.code === "Enter" || (startMenuIndex === 2 && e.code === "Space")) {
+          if (
+            e.code === "Enter" ||
+            (startMenuIndex === 2 && e.code === "Space")
+          ) {
             if (startMenuIndex === 2) {
               startGame();
             } else {
@@ -438,7 +465,10 @@
             e.preventDefault();
           }
           if (e.code === "ArrowDown" || e.code === "KeyS") {
-            pauseMenuIndex = Math.min(pauseOptions.length - 1, pauseMenuIndex + 1);
+            pauseMenuIndex = Math.min(
+              pauseOptions.length - 1,
+              pauseMenuIndex + 1,
+            );
             updatePauseMenuVisuals();
             e.preventDefault();
           }
@@ -466,7 +496,7 @@
       // Mobile Touch Input Binding Mechanics
       function setupTouchButton(elementId, keyCode) {
         const button = document.getElementById(elementId);
-        
+
         const triggerPress = (e) => {
           e.preventDefault();
           initAudio();
@@ -476,7 +506,7 @@
           }
           keys[keyCode] = true;
         };
-        
+
         const triggerRelease = (e) => {
           e.preventDefault();
           keys[keyCode] = false;
@@ -484,7 +514,9 @@
 
         button.addEventListener("touchstart", triggerPress, { passive: false });
         button.addEventListener("touchend", triggerRelease, { passive: false });
-        button.addEventListener("touchcancel", triggerRelease, { passive: false });
+        button.addEventListener("touchcancel", triggerRelease, {
+          passive: false,
+        });
       }
 
       setupTouchButton("btn-left", "ArrowLeft");
@@ -493,14 +525,18 @@
       setupTouchButton("btn-attack", "Space");
 
       // Global touch listener to dynamically toggle display of mobile controls
-      window.addEventListener("touchstart", function initTouchDisplay() {
-        if (!isMobileDetected) {
-          isMobileDetected = true;
-          if (gameState === "playing") {
-            touchControls.classList.remove("hidden");
+      window.addEventListener(
+        "touchstart",
+        function initTouchDisplay() {
+          if (!isMobileDetected) {
+            isMobileDetected = true;
+            if (gameState === "playing") {
+              touchControls.classList.remove("hidden");
+            }
           }
-        }
-      }, { passive: true });
+        },
+        { passive: true },
+      );
 
       // Button click fallbacks for mouse users
       document.getElementById("btn-start").addEventListener("click", startGame);
