@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Vaelorush</title>
     <meta name="description" content="Vaelorush - An endless platformer game" />
     <meta name="author" content="Vasileios Apostolidis-Afentoulis" />
@@ -18,6 +18,8 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
       }
       #game-container {
         position: relative;
@@ -55,6 +57,8 @@
         color: #aaa;
         margin-bottom: 30px;
         font-size: 20px;
+        text-align: center;
+        padding: 0 10px;
       }
       .form-group {
         margin: 15px 0;
@@ -72,6 +76,9 @@
         cursor: pointer;
         border-radius: 4px;
         width: 350px;
+        max-width: 85vw;
+        transition: all 0.2s;
+        outline: none;
       }
       button {
         background: #934c0b;
@@ -79,8 +86,15 @@
         font-weight: bold;
         margin-top: 30px;
       }
-      button:hover {
+      button:hover, button:focus {
         background: #703d0d;
+      }
+      
+      /* Active Navigation Focus Styles */
+      select.menu-focused, button.menu-focused {
+        border-color: #f1c40f !important;
+        box-shadow: 0 0 12px #f1c40f;
+        background: #444;
       }
 
       #hud {
@@ -103,6 +117,7 @@
         font-size: 16px;
         margin-top: 15px;
         color: #bbb;
+        text-align: center;
       }
 
       /* Pause Menu Styles */
@@ -113,11 +128,60 @@
         border: 2px solid transparent;
         color: #aaa;
         transition: all 0.2s;
+        cursor: pointer;
       }
       .menu-option.selected {
         border-color: #f1c40f;
         color: #f1c40f;
         background: rgba(241, 196, 15, 0.2);
+      }
+
+      /* Touch Virtual On-Screen Controls */
+      #touch-controls {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 8;
+      }
+      .touch-zone {
+        position: absolute;
+        bottom: 25px;
+        display: flex;
+        pointer-events: auto;
+      }
+      #touch-dpad {
+        left: 25px;
+        gap: 15px;
+      }
+      #touch-actions {
+        right: 25px;
+        gap: 15px;
+      }
+      .touch-btn {
+        width: 70px;
+        height: 70px;
+        background: rgba(0, 0, 0, 0.6);
+        border: 3px solid #777;
+        color: #fff;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+        font-size: 24px;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+      }
+      .touch-btn:active {
+        background: rgba(241, 196, 15, 0.4);
+        border-color: #f1c40f;
+      }
+      @media (hover: none) and (pointer: coarse) {
+        .controls-hint { display: none; }
       }
     </style>
   </head>
@@ -144,9 +208,21 @@
         </div>
       </div>
 
+      <!-- Touch Overlay Elements -->
+      <div id="touch-controls" class="hidden">
+        <div id="touch-dpad" class="touch-zone">
+          <div class="touch-btn" id="btn-left">←</div>
+          <div class="touch-btn" id="btn-right">→</div>
+        </div>
+        <div id="touch-actions" class="touch-zone">
+          <div class="touch-btn" id="btn-attack" style="font-size: 16px;">ATK</div>
+          <div class="touch-btn" id="btn-jump" style="font-size: 16px;">JUMP</div>
+        </div>
+      </div>
+
       <div id="start-screen" class="screen">
         <h1>Vaelorush</h1>
-        <p class="subtitle">Select your character's Ancestry & Class</p>
+        <p class="subtitle">Select your character's Ancestry & Class<br><span style="font-size:14px; color:#f1c40f;">[Up/Down/Left/Right] to configure | [Enter] to Start</span></p>
 
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px">Ancestry:</label>
@@ -200,9 +276,17 @@
       const pauseScreen = document.getElementById("pause-screen");
       const gameOverScreen = document.getElementById("game-over-screen");
       const hud = document.getElementById("hud");
+      const touchControls = document.getElementById("touch-controls");
 
       let gameState = "menu"; // menu, playing, paused, gameover
       let keys = {};
+      let isMobileDetected = false;
+
+      // Menu system indices
+      let startMenuIndex = 0;
+      const startOptions = ["sel-ancestry", "sel-class", "btn-start"];
+      let pauseMenuIndex = 0;
+      const pauseOptions = ["menu-resume", "menu-difficulty", "menu-quit"];
 
       // Game configuration variables
       let difficultyMult = 1.0;
@@ -215,9 +299,62 @@
       ];
       let difficultyIndex = 1;
 
-      // Pause menu navigation
-      let pauseMenuIndex = 0;
-      const pauseOptions = ["menu-resume", "menu-difficulty", "menu-quit"];
+      // Procedural Audio Synthesizer Engine (Web Audio API)
+      let audioCtx = null;
+      function initAudio() {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+      }
+
+      function playSound(type) {
+        try {
+          initAudio();
+          if (!audioCtx) return;
+
+          const osc = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          osc.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          const now = audioCtx.currentTime;
+
+          if (type === "kill") {
+            // Low synth crunch for monster death
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(160, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.2);
+            gainNode.gain.setValueAtTime(0.25, now);
+            gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now);
+            osc.stop(now + 0.2);
+          } else if (type === "loot") {
+            // Quick high-pitched dual arpeggio ding
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(587.33, now); // D5
+            osc.frequency.setValueAtTime(880.00, now + 0.07); // A5
+            gainNode.gain.setValueAtTime(0.15, now);
+            gainNode.gain.linearRampToValueAtTime(0.01, now + 0.22);
+            osc.start(now);
+            osc.stop(now + 0.22);
+          } else if (type === "levelup") {
+            // Triumphant classic chiptune scale run
+            osc.type = "sine";
+            const notes = [261.63, 329.63, 392.00, 523.25, 659.25]; // C E G C E
+            notes.forEach((freq, i) => {
+              osc.frequency.setValueAtTime(freq, now + i * 0.08);
+            });
+            gainNode.gain.setValueAtTime(0.2, now);
+            gainNode.gain.linearRampToValueAtTime(0.01, now + 0.45);
+            osc.start(now);
+            osc.stop(now + 0.45);
+          }
+        } catch (e) {
+          console.log("Audio play blocked or unsupported:", e);
+        }
+      }
 
       function resizeCanvas() {
         canvas.width = window.innerWidth;
@@ -226,8 +363,21 @@
       window.addEventListener("resize", resizeCanvas);
       resizeCanvas();
 
-      // Keyboard listener to handle menus
+      function updateStartMenuVisuals() {
+        startOptions.forEach((id, index) => {
+          let el = document.getElementById(id);
+          if (index === startMenuIndex) {
+            el.classList.add("menu-focused");
+          } else {
+            el.classList.remove("menu-focused");
+          }
+        });
+      }
+      updateStartMenuVisuals();
+
+      // Consolidated Keyboard Navigation Input Handling
       window.addEventListener("keydown", (e) => {
+        initAudio(); // Audio activation on interaction
         keys[e.code] = true;
 
         if (e.code === "Escape") {
@@ -240,33 +390,126 @@
             gameState = "playing";
             pauseScreen.classList.add("hidden");
           }
+          return;
         }
 
+        // Start Screen Menu Loop
+        if (gameState === "menu") {
+          if (e.code === "ArrowUp" || e.code === "KeyW") {
+            startMenuIndex = Math.max(0, startMenuIndex - 1);
+            updateStartMenuVisuals();
+            e.preventDefault();
+          }
+          if (e.code === "ArrowDown" || e.code === "KeyS") {
+            startMenuIndex = Math.min(startOptions.length - 1, startMenuIndex + 1);
+            updateStartMenuVisuals();
+            e.preventDefault();
+          }
+          
+          // Dropdown programmatic option cycling
+          if (startMenuIndex < 2) {
+            let selectEl = document.getElementById(startOptions[startMenuIndex]);
+            if (e.code === "ArrowLeft" || e.code === "KeyA") {
+              selectEl.selectedIndex = Math.max(0, selectEl.selectedIndex - 1);
+              e.preventDefault();
+            }
+            if (e.code === "ArrowRight" || e.code === "KeyD") {
+              selectEl.selectedIndex = Math.min(selectEl.options.length - 1, selectEl.selectedIndex + 1);
+              e.preventDefault();
+            }
+          }
+
+          if (e.code === "Enter" || (startMenuIndex === 2 && e.code === "Space")) {
+            if (startMenuIndex === 2) {
+              startGame();
+            } else {
+              startMenuIndex = 2; // Jump down to the start button
+              updateStartMenuVisuals();
+            }
+            e.preventDefault();
+          }
+        }
+
+        // Pause Menu Control Handling
         if (gameState === "paused") {
-          if (e.code === "ArrowUp") {
+          if (e.code === "ArrowUp" || e.code === "KeyW") {
             pauseMenuIndex = Math.max(0, pauseMenuIndex - 1);
             updatePauseMenuVisuals();
+            e.preventDefault();
           }
-          if (e.code === "ArrowDown") {
-            pauseMenuIndex = Math.min(
-              pauseOptions.length - 1,
-              pauseMenuIndex + 1,
-            );
+          if (e.code === "ArrowDown" || e.code === "KeyS") {
+            pauseMenuIndex = Math.min(pauseOptions.length - 1, pauseMenuIndex + 1);
             updatePauseMenuVisuals();
+            e.preventDefault();
           }
-          if (e.code === "Enter") {
+          if (e.code === "Enter" || e.code === "Space") {
             executePauseMenu();
+            e.preventDefault();
+          }
+        }
+
+        // Game Over Quick Reset
+        if (gameState === "gameover") {
+          if (e.code === "Enter" || e.code === "Space") {
+            gameOverScreen.classList.add("hidden");
+            startScreen.classList.remove("hidden");
+            gameState = "menu";
+            startMenuIndex = 2;
+            updateStartMenuVisuals();
+            e.preventDefault();
           }
         }
       });
 
       window.addEventListener("keyup", (e) => (keys[e.code] = false));
 
+      // Mobile Touch Input Binding Mechanics
+      function setupTouchButton(elementId, keyCode) {
+        const button = document.getElementById(elementId);
+        
+        const triggerPress = (e) => {
+          e.preventDefault();
+          initAudio();
+          if (!isMobileDetected) {
+            isMobileDetected = true;
+            touchControls.classList.remove("hidden");
+          }
+          keys[keyCode] = true;
+        };
+        
+        const triggerRelease = (e) => {
+          e.preventDefault();
+          keys[keyCode] = false;
+        };
+
+        button.addEventListener("touchstart", triggerPress, { passive: false });
+        button.addEventListener("touchend", triggerRelease, { passive: false });
+        button.addEventListener("touchcancel", triggerRelease, { passive: false });
+      }
+
+      setupTouchButton("btn-left", "ArrowLeft");
+      setupTouchButton("btn-right", "ArrowRight");
+      setupTouchButton("btn-jump", "ArrowUp");
+      setupTouchButton("btn-attack", "Space");
+
+      // Global touch listener to dynamically toggle display of mobile controls
+      window.addEventListener("touchstart", function initTouchDisplay() {
+        if (!isMobileDetected) {
+          isMobileDetected = true;
+          if (gameState === "playing") {
+            touchControls.classList.remove("hidden");
+          }
+        }
+      }, { passive: true });
+
       // Button click fallbacks for mouse users
       document.getElementById("btn-start").addEventListener("click", startGame);
       document.getElementById("btn-restart").addEventListener("click", () => {
         gameOverScreen.classList.add("hidden");
         startScreen.classList.remove("hidden");
+        gameState = "menu";
+        startMenuIndex = 2;
+        updateStartMenuVisuals();
       });
 
       // Pause Menu Logic
@@ -282,6 +525,7 @@
         if (pauseMenuIndex === 0) {
           // Resume
           gameState = "playing";
+          if (isMobileDetected) touchControls.classList.remove("hidden");
           pauseScreen.classList.add("hidden");
         } else if (pauseMenuIndex === 1) {
           // Toggle Difficulty
@@ -295,9 +539,23 @@
           gameState = "menu";
           pauseScreen.classList.add("hidden");
           hud.classList.add("hidden");
+          touchControls.classList.add("hidden");
           startScreen.classList.remove("hidden");
+          startMenuIndex = 2;
+          updateStartMenuVisuals();
         }
       }
+
+      // Intercept canvas tap to act as Pause toggler on mobile
+      canvas.addEventListener("touchstart", (e) => {
+        if (gameState === "playing" && e.touches[0].clientY < 100) {
+          gameState = "paused";
+          pauseMenuIndex = 0;
+          updatePauseMenuVisuals();
+          touchControls.classList.add("hidden");
+          pauseScreen.classList.remove("hidden");
+        }
+      });
 
       const GRAVITY = 0.5;
       const FRICTION = 0.8;
@@ -435,6 +693,7 @@
 
         startScreen.classList.add("hidden");
         hud.classList.remove("hidden");
+        if (isMobileDetected) touchControls.classList.remove("hidden");
         gameState = "playing";
       }
 
@@ -800,6 +1059,7 @@
           // Death Cleanup & Scaling Loot Drop
           if (e.y > 2000 || e.hp <= 0) {
             if (e.hp <= 0) {
+              playSound("kill"); // Sound trigger on monster defeat
               player.xp += e.xpVal;
               spawnFloatingText(
                 e.x,
@@ -834,6 +1094,7 @@
           it.visualY = visualY;
 
           if (checkCollision(player, it)) {
+            playSound("loot"); // Sound trigger on loot pick up
             if (it.loot.type === "wep") {
               player.weaponName = it.loot.name;
               player.weaponColor = it.loot.color;
@@ -863,6 +1124,7 @@
 
         // Level Up System
         if (player.xp >= player.xpNeeded) {
+          playSound("levelup"); // Sound trigger on level up achievement
           player.level++;
           player.xp -= player.xpNeeded;
           player.xpNeeded = Math.floor(player.xpNeeded * 1.5);
@@ -876,6 +1138,7 @@
         if (player.hp <= 0) {
           gameState = "gameover";
           hud.classList.add("hidden");
+          touchControls.classList.add("hidden");
           gameOverScreen.classList.remove("hidden");
           document.getElementById("go-level").innerText = player.level;
         }
