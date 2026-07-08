@@ -2,9 +2,13 @@
 
 An endless, procedurally generated 2D action-platformer built entirely in vanilla HTML5, CSS3, and JavaScript. Inspired by Pathfinder 2nd Edition (PF2e) mechanics, **Vaelorush** challenges players to descend into an infinite dungeon, level up, collect unique loot, and survive monstrous threats.
 
-![Main Menu](./img/vaelorush_menu.png)
+| Main Menu (on PC)| Running (on PC)|
+|---|---|
+| ![Main Menu](./img/vaelorush_menu.png) | ![Running](./img/vaelorush_running.png)|
 
-![Running](./img/vaelorush_running.png)
+| Main Menu (on Mobile)| Running (on Mobile)|
+|---|---|
+| ![Main Menu Mobile](./img/vaelorush_mobile_menu.png) | ![Running Mobile](./img/vaelorush_mobile_running.png)|
 
 ---
 
@@ -18,7 +22,7 @@ or online:
 
 * Visit: https://vapoafe.github.io/vaelorush
 
-### Desktop Controls
+### PC Controls
 * **Movement**: `A` / `D` or `Left` / `Right` Arrow keys
 
 * **Jump**: `W` or `Up` Arrow key *(Supports double jumps for specific classes)*
@@ -28,11 +32,11 @@ or online:
 * **Pause / Menu Selection**: `ESC` to toggle pause, `W`/`S` or Arrow keys to navigate, `ENTER` or `SPACEBAR` to confirm options.
 
 ### Mobile / Touch Controls
-* **Dynamic Virtual D-Pad**: To move left or right, tap on `<` and `>` overlays.
+* **Direction Pads**: To move left or right, tap on `<` and `>` overlays.
 
 * **Action Buttons**: Dedicated nodes for `ATK` and `JUMP`.
 
-* **Tap-to-Pause**: Tap anywhere at the **top** of the screen to safely toggle the pause menu.
+* **`Pause` Button**: Safely toggles the pause menu.
 
 ---
 

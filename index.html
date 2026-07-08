@@ -221,6 +221,24 @@
 
       <!-- Touch Overlay Elements -->
       <div id="touch-controls" class="hidden">
+        <div
+          id="btn-pause"
+          class="touch-btn"
+          style="
+            position: absolute;
+            top: 15px;
+            left: 85%;
+            transform: translateX(-50%);
+            width: auto;
+            height: 40px;
+            padding: 0 20px;
+            font-size: 18px;
+            border-radius: 20px;
+            z-index: 10;
+          "
+        >
+          Pause
+        </div>
         <div id="touch-dpad" class="touch-zone">
           <div class="touch-btn" id="btn-left"><</div>
           <div class="touch-btn" id="btn-right">></div>
@@ -584,6 +602,20 @@
           else el.classList.remove("selected");
         });
       }
+
+      // Touch screen Pause button logic
+      document
+        .getElementById("btn-pause")
+        .addEventListener("touchstart", (e) => {
+          e.preventDefault(); // Prevents double-firing events on some devices
+          if (gameState === "playing") {
+            gameState = "paused";
+            pauseMenuIndex = 0;
+            updatePauseMenuVisuals();
+            touchControls.classList.add("hidden");
+            pauseScreen.classList.remove("hidden");
+          }
+        });
 
       function executePauseMenu() {
         if (pauseMenuIndex === 0) {
