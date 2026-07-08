@@ -552,6 +552,30 @@
         updateStartMenuVisuals();
       });
 
+      // Pause Menu click fallbacks for mouse/touch users
+      document.getElementById("menu-resume").addEventListener("click", () => {
+        if (gameState !== "paused") return;
+        pauseMenuIndex = 0;
+        updatePauseMenuVisuals();
+        executePauseMenu();
+      });
+
+      document
+        .getElementById("menu-difficulty")
+        .addEventListener("click", () => {
+          if (gameState !== "paused") return;
+          pauseMenuIndex = 1;
+          updatePauseMenuVisuals();
+          executePauseMenu();
+        });
+
+      document.getElementById("menu-quit").addEventListener("click", () => {
+        if (gameState !== "paused") return;
+        pauseMenuIndex = 2;
+        updatePauseMenuVisuals();
+        executePauseMenu();
+      });
+
       // Pause Menu Logic
       function updatePauseMenuVisuals() {
         pauseOptions.forEach((id, index) => {
@@ -642,7 +666,7 @@
           armorName: "Basic",
           weaponColor: "#bdc3c7",
           regenTimer: 0,
-          invuln: 0,
+          invulnerability: 0,
         };
 
         // Ancestry Modifiers
@@ -783,7 +807,7 @@
               maxHp: 10 * statMultiplier,
               damage: 3 * statMultiplier,
               xpVal: Math.floor(10 * statMultiplier),
-              invuln: 0,
+              invulnerability: 0,
               type: "Goblin",
               color: "#2ecc71",
               patrolStartX: currentX,
@@ -1019,7 +1043,10 @@
           if (player.class === "wizard" || player.class === "ranger") {
             let isMagic = player.class === "wizard";
             projectiles.push({
-              x: player.attackDirection > 0 ? player.x + player.width : player.x - 15,
+              x:
+                player.attackDirection > 0
+                  ? player.x + player.width
+                  : player.x - 15,
               y: player.y + player.height / 2 - 5,
               width: isMagic ? 12 : 16,
               height: isMagic ? 12 : 4,
@@ -1083,7 +1110,11 @@
           }
 
           // Contact Damage to Player
-          if (checkCollision(player, e) && player.invulnerability <= 0 && e.hp > 0) {
+          if (
+            checkCollision(player, e) &&
+            player.invulnerability <= 0 &&
+            e.hp > 0
+          ) {
             player.hp -= e.damage;
             player.invulnerability = 45;
             player.velocityY = -6; // Player gets knocked back too
@@ -1192,7 +1223,9 @@
         e.invulnerability = 15;
         // Knockback physics
         let pushDirection =
-          directionOverride !== null ? directionOverride : player.attackDirection;
+          directionOverride !== null
+            ? directionOverride
+            : player.attackDirection;
         e.velocityX = pushDirection * 7;
         e.velocityY = -5; // Pop them up into the air
         spawnFloatingText(e.x, e.y - 10, "-" + Math.floor(dmg), "#fff");
@@ -1214,7 +1247,11 @@
 
       // Rendering System
       function drawPlayer() {
-        if (player.invulnerability > 0 && Math.floor(Date.now() / 100) % 2 === 0) return; // Damage blink
+        if (
+          player.invulnerability > 0 &&
+          Math.floor(Date.now() / 100) % 2 === 0
+        )
+          return; // Damage blink
 
         const px = player.x;
         const py = player.y;
@@ -1337,7 +1374,8 @@
 
         // Draw Enemies
         for (let e of enemies) {
-          if (e.invulnerability > 0 && Math.floor(Date.now() / 50) % 2 === 0) continue;
+          if (e.invulnerability > 0 && Math.floor(Date.now() / 50) % 2 === 0)
+            continue;
 
           let faceDirection = e.velocityX > 0 ? 1 : -1;
 
@@ -1351,7 +1389,10 @@
             ctx.fillStyle = "#27ae60";
             ctx.beginPath();
             ctx.moveTo(e.x + (faceDirection === 1 ? e.width : 0), e.y + 10);
-            ctx.lineTo(e.x + (faceDirection === 1 ? e.width + 10 : -10), e.y + 5);
+            ctx.lineTo(
+              e.x + (faceDirection === 1 ? e.width + 10 : -10),
+              e.y + 5,
+            );
             ctx.lineTo(e.x + (faceDirection === 1 ? e.width : 0), e.y + 15);
             ctx.fill();
           } else if (e.type === "Orc") {
@@ -1372,7 +1413,12 @@
           } else if (e.type === "Ogre") {
             // Cyclops eye
             ctx.fillStyle = "#fff";
-            ctx.fillRect(e.x + e.width / 2 - 4 + faceDirection * 4, e.y + 8, 12, 12);
+            ctx.fillRect(
+              e.x + e.width / 2 - 4 + faceDirection * 4,
+              e.y + 8,
+              12,
+              12,
+            );
             ctx.fillStyle = "#000"; // pupil
             ctx.fillRect(e.x + e.width / 2 + faceDirection * 6, e.y + 12, 4, 4);
           }
