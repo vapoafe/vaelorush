@@ -309,7 +309,7 @@
       const pauseOptions = ["menu-resume", "menu-difficulty", "menu-quit"];
 
       // Game configuration variables
-      let difficultyMult = 1.0;
+      let difficultyMultiplier = 1.0;
       let difficultyLabel = "Normal";
       const difficulties = [
         { label: "Easy", mult: 0.7 },
@@ -570,7 +570,7 @@
         } else if (pauseMenuIndex === 1) {
           // Toggle Difficulty
           difficultyIndex = (difficultyIndex + 1) % difficulties.length;
-          difficultyMult = difficulties[difficultyIndex].mult;
+          difficultyMultiplier = difficulties[difficultyIndex].mult;
           difficultyLabel = difficulties[difficultyIndex].label;
           document.getElementById("menu-difficulty").innerText =
             "Difficulty: " + difficultyLabel;
@@ -619,8 +619,8 @@
           y: 300,
           width: 20,
           height: 36,
-          vx: 0,
-          vy: 0,
+          velocityX: 0,
+          velocityY: 0,
           speed: 5,
           jumpPower: -11,
           maxJumps: 1,
@@ -635,7 +635,7 @@
           ancestry: ancestry,
           attackCooldown: 25,
           attackTimer: 0,
-          attackDir: 1,
+          attackDirection: 1,
           skinColor: "#ffcc99",
           bodyColor: "#ccc",
           weaponName: "Basic",
@@ -769,15 +769,15 @@
             let spawnY = spawnOnGround ? 500 : y - 50;
 
             // Level Scaling Stats
-            let statMultiplier = 1 + player.level * 0.15 * difficultyMult;
+            let statMultiplier = 1 + player.level * 0.15 * difficultyMultiplier;
 
             let e = {
               x: currentX + w / 2,
               y: spawnY,
               width: 24,
               height: 34,
-              vx: 0,
-              vy: 0,
+              velocityX: 0,
+              velocityY: 0,
               speed: 2 + player.level * 0.05, // Get slightly faster over time
               hp: 10 * statMultiplier,
               maxHp: 10 * statMultiplier,
@@ -811,7 +811,7 @@
               e.speed = 1.5 + player.level * 0.03;
             }
 
-            e.vx = (Math.random() > 0.5 ? 1 : -1) * e.speed;
+            e.velocityX = (Math.random() > 0.5 ? 1 : -1) * e.speed;
 
             // Expand patrol area if they spawn on the endless main floor
             if (spawnOnGround) {
@@ -880,7 +880,7 @@
           },
         ];
 
-        let dropChance = player.level * difficultyMult * 2; // Increases chances of rolling Rare
+        let dropChance = player.level * difficultyMultiplier * 2; // Increases chances of rolling Rare
         let loot;
 
         if (Math.random() * 100 < dropChance) {
@@ -895,7 +895,7 @@
           width: 16,
           height: 16,
           loot: loot,
-          vy: -6,
+          velocityY: -6,
           bob: 0,
         });
       }
@@ -910,39 +910,39 @@
       }
 
       function applyPhysicsAndCollision(entity, isPlayer) {
-        entity.vy += GRAVITY;
-        if (!isPlayer && entity.invuln <= 0) {
+        entity.velocityY += GRAVITY;
+        if (!isPlayer && entity.invulnerability <= 0) {
           // Enemy normal logic
         } else {
-          entity.vx *= FRICTION;
+          entity.velocityX *= FRICTION;
         }
 
         // X Collision
-        entity.x += entity.vx;
+        entity.x += entity.velocityX;
         for (let p of platforms) {
           if (checkCollision(entity, p)) {
-            if (entity.vx > 0) {
+            if (entity.velocityX > 0) {
               entity.x = p.x - entity.width;
-              entity.vx = 0;
-            } else if (entity.vx < 0) {
+              entity.velocityX = 0;
+            } else if (entity.velocityX < 0) {
               entity.x = p.x + p.width;
-              entity.vx = 0;
+              entity.velocityX = 0;
             }
           }
         }
 
         // Y Collision
-        entity.y += entity.vy;
+        entity.y += entity.velocityY;
         let onGround = false;
         for (let p of platforms) {
           if (checkCollision(entity, p)) {
-            if (entity.vy > 0) {
+            if (entity.velocityY > 0) {
               entity.y = p.y - entity.height;
-              entity.vy = 0;
+              entity.velocityY = 0;
               onGround = true;
-            } else if (entity.vy < 0) {
+            } else if (entity.velocityY < 0) {
               entity.y = p.y + p.height;
-              entity.vy = 0;
+              entity.velocityY = 0;
             }
           }
         }
@@ -964,24 +964,24 @@
 
         // Horizontal Movement
         if (keys["ArrowLeft"] || keys["KeyA"]) {
-          player.vx -= 1.2;
-          player.attackDir = -1;
+          player.velocityX -= 1.2;
+          player.attackDirection = -1;
         }
         if (keys["ArrowRight"] || keys["KeyD"]) {
-          player.vx += 1.2;
-          player.attackDir = 1;
+          player.velocityX += 1.2;
+          player.attackDirection = 1;
         }
 
         // Cap speed
-        if (player.vx > player.speed) player.vx = player.speed;
-        if (player.vx < -player.speed) player.vx = -player.speed;
+        if (player.velocityX > player.speed) player.velocityX = player.speed;
+        if (player.velocityX < -player.speed) player.velocityX = -player.speed;
 
         // Jump Logic
         if (
           (keys["ArrowUp"] || keys["KeyW"]) &&
           player.jumps < player.maxJumps
         ) {
-          player.vy = player.jumpPower;
+          player.velocityY = player.jumpPower;
           player.jumps++;
           keys["ArrowUp"] = false;
           keys["KeyW"] = false;
@@ -1010,7 +1010,7 @@
 
         // Timers
         if (player.attackTimer > 0) player.attackTimer--;
-        if (player.invuln > 0) player.invuln--;
+        if (player.invulnerability > 0) player.invulnerability--;
 
         // Attack Action
         if (keys["Space"] && player.attackTimer <= 0) {
@@ -1019,11 +1019,11 @@
           if (player.class === "wizard" || player.class === "ranger") {
             let isMagic = player.class === "wizard";
             projectiles.push({
-              x: player.attackDir > 0 ? player.x + player.width : player.x - 15,
+              x: player.attackDirection > 0 ? player.x + player.width : player.x - 15,
               y: player.y + player.height / 2 - 5,
               width: isMagic ? 12 : 16,
               height: isMagic ? 12 : 4,
-              vx: player.attackDir * (isMagic ? 8 : 12),
+              velocityX: player.attackDirection * (isMagic ? 8 : 12),
               life: 80,
               damage: player.damage,
               color: isMagic ? player.weaponColor : "#fff",
@@ -1033,7 +1033,7 @@
             let range = player.weaponType === "greatsword" ? 60 : 40;
             let hitbox = {
               x:
-                player.attackDir === 1
+                player.attackDirection === 1
                   ? player.x + player.width
                   : player.x - range,
               y: player.y - 10,
@@ -1053,12 +1053,12 @@
         // Update Projectiles
         for (let i = projectiles.length - 1; i >= 0; i--) {
           let p = projectiles[i];
-          p.x += p.vx;
+          p.x += p.velocityX;
           p.life--;
           let hit = false;
           for (let e of enemies) {
             if (checkCollision(p, e)) {
-              hitEnemy(e, p.damage, p.vx > 0 ? 1 : -1);
+              hitEnemy(e, p.damage, p.velocityX > 0 ? 1 : -1);
               hit = true;
               break;
             }
@@ -1073,21 +1073,21 @@
           // Gravity & Physics for enemies
           applyPhysicsAndCollision(e, false);
 
-          if (e.invuln > 0) {
-            e.invuln--;
+          if (e.invulnerability > 0) {
+            e.invulnerability--;
           } else {
             // Patrol behavior (only move horizontally when not knocked back)
-            e.vx = (e.vx > 0 ? 1 : -1) * e.speed; // Maintain speed direction
-            if (e.x <= e.patrolStartX) e.vx = Math.abs(e.speed);
-            if (e.x + e.width >= e.patrolEndX) e.vx = -Math.abs(e.speed);
+            e.velocityX = (e.velocityX > 0 ? 1 : -1) * e.speed; // Maintain speed direction
+            if (e.x <= e.patrolStartX) e.velocityX = Math.abs(e.speed);
+            if (e.x + e.width >= e.patrolEndX) e.velocityX = -Math.abs(e.speed);
           }
 
           // Contact Damage to Player
-          if (checkCollision(player, e) && player.invuln <= 0 && e.hp > 0) {
+          if (checkCollision(player, e) && player.invulnerability <= 0 && e.hp > 0) {
             player.hp -= e.damage;
-            player.invuln = 45;
-            player.vy = -6; // Player gets knocked back too
-            player.vx = player.x < e.x ? -6 : 6;
+            player.invulnerability = 45;
+            player.velocityY = -6; // Player gets knocked back too
+            player.velocityX = player.x < e.x ? -6 : 6;
             spawnFloatingText(
               player.x,
               player.y - 10,
@@ -1120,12 +1120,12 @@
           let it = items[i];
           it.bob += 0.1;
           // Loot physics
-          it.vy += GRAVITY;
-          it.y += it.vy;
+          it.velocityY += GRAVITY;
+          it.y += it.velocityY;
           for (let p of platforms) {
-            if (checkCollision(it, p) && it.vy > 0) {
+            if (checkCollision(it, p) && it.velocityY > 0) {
               it.y = p.y - it.height;
-              it.vy = 0;
+              it.velocityY = 0;
             }
           }
 
@@ -1189,12 +1189,12 @@
       // Applies damage and physical knockback to enemies
       function hitEnemy(e, dmg, directionOverride = null) {
         e.hp -= dmg;
-        e.invuln = 15;
+        e.invulnerability = 15;
         // Knockback physics
-        let pushDir =
-          directionOverride !== null ? directionOverride : player.attackDir;
-        e.vx = pushDir * 7;
-        e.vy = -5; // Pop them up into the air
+        let pushDirection =
+          directionOverride !== null ? directionOverride : player.attackDirection;
+        e.velocityX = pushDirection * 7;
+        e.velocityY = -5; // Pop them up into the air
         spawnFloatingText(e.x, e.y - 10, "-" + Math.floor(dmg), "#fff");
       }
 
@@ -1214,11 +1214,11 @@
 
       // Rendering System
       function drawPlayer() {
-        if (player.invuln > 0 && Math.floor(Date.now() / 100) % 2 === 0) return; // Damage blink
+        if (player.invulnerability > 0 && Math.floor(Date.now() / 100) % 2 === 0) return; // Damage blink
 
         const px = player.x;
         const py = player.y;
-        const dir = player.attackDir;
+        const dir = player.attackDirection;
         const w = player.width;
         const h = player.height;
 
@@ -1247,7 +1247,7 @@
         // Legs (animating slightly if moving)
         ctx.fillStyle = "#111";
         let walkCycle =
-          Math.abs(player.vx) > 0.5 ? Math.sin(Date.now() / 100) * 4 : 0;
+          Math.abs(player.velocityX) > 0.5 ? Math.sin(Date.now() / 100) * 4 : 0;
         ctx.fillRect(px + w * 0.2 - walkCycle, py + h - 8, w * 0.25, 8); // Back leg
         ctx.fillRect(px + w * 0.55 + walkCycle, py + h - 8, w * 0.25, 8); // Front leg
 
@@ -1337,9 +1337,9 @@
 
         // Draw Enemies
         for (let e of enemies) {
-          if (e.invuln > 0 && Math.floor(Date.now() / 50) % 2 === 0) continue;
+          if (e.invulnerability > 0 && Math.floor(Date.now() / 50) % 2 === 0) continue;
 
-          let faceDir = e.vx > 0 ? 1 : -1;
+          let faceDirection = e.velocityX > 0 ? 1 : -1;
 
           // Draw Body
           ctx.fillStyle = e.color;
@@ -1350,21 +1350,21 @@
             // Pointy ears
             ctx.fillStyle = "#27ae60";
             ctx.beginPath();
-            ctx.moveTo(e.x + (faceDir === 1 ? e.width : 0), e.y + 10);
-            ctx.lineTo(e.x + (faceDir === 1 ? e.width + 10 : -10), e.y + 5);
-            ctx.lineTo(e.x + (faceDir === 1 ? e.width : 0), e.y + 15);
+            ctx.moveTo(e.x + (faceDirection === 1 ? e.width : 0), e.y + 10);
+            ctx.lineTo(e.x + (faceDirection === 1 ? e.width + 10 : -10), e.y + 5);
+            ctx.lineTo(e.x + (faceDirection === 1 ? e.width : 0), e.y + 15);
             ctx.fill();
           } else if (e.type === "Orc") {
             // Tusks
             ctx.fillStyle = "#fff";
             ctx.fillRect(
-              e.x + (faceDir === 1 ? e.width - 4 : 2),
+              e.x + (faceDirection === 1 ? e.width - 4 : 2),
               e.y + e.height - 12,
               2,
               6,
             );
             ctx.fillRect(
-              e.x + (faceDir === 1 ? e.width - 8 : 6),
+              e.x + (faceDirection === 1 ? e.width - 8 : 6),
               e.y + e.height - 10,
               2,
               4,
@@ -1372,16 +1372,16 @@
           } else if (e.type === "Ogre") {
             // Cyclops eye
             ctx.fillStyle = "#fff";
-            ctx.fillRect(e.x + e.width / 2 - 4 + faceDir * 4, e.y + 8, 12, 12);
+            ctx.fillRect(e.x + e.width / 2 - 4 + faceDirection * 4, e.y + 8, 12, 12);
             ctx.fillStyle = "#000"; // pupil
-            ctx.fillRect(e.x + e.width / 2 + faceDir * 6, e.y + 12, 4, 4);
+            ctx.fillRect(e.x + e.width / 2 + faceDirection * 6, e.y + 12, 4, 4);
           }
 
           // Default Eyes (if not ogre)
           if (e.type !== "Ogre") {
             ctx.fillStyle = "#e74c3c";
             ctx.fillRect(
-              e.x + (faceDir === 1 ? e.width - 8 : 4),
+              e.x + (faceDirection === 1 ? e.width - 8 : 4),
               e.y + 6,
               4,
               4,
