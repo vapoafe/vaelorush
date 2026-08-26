@@ -16,7 +16,7 @@ An endless, procedurally generated 2D action-platformer built entirely in vanill
 
 You can play the game both locally:
 
-* Open `index.html` directly in any modern desktop or mobile web browser to play instantly—no installation or build steps required.
+* Open `index.html` directly in any modern desktop or mobile web browser to play instantly - no installation or build steps required.
 
 or online:
 
